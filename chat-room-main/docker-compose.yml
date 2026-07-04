@@ -1,0 +1,60 @@
+version: "3.9"
+
+services:
+
+  mongo:
+    image: mongo:7
+
+    container_name: mongo
+
+    restart: always
+
+    ports:
+      - "27017:27017"
+
+    volumes:
+      - mongo-data:/data/db
+
+    networks:
+      - chat-network
+
+  backend:
+
+    build:
+      context: ./backend
+
+    container_name: chat-backend
+
+    depends_on:
+      - mongo
+
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/chatdb
+
+    ports:
+      - "8080:8080"
+
+    networks:
+      - chat-network
+
+  frontend:
+
+    build:
+      context: ./front-chat
+
+    container_name: chat-frontend
+
+    depends_on:
+      - backend
+
+    ports:
+      - "3000:80"
+
+    networks:
+      - chat-network
+
+networks:
+  chat-network:
+
+volumes:
+  mongo-data:

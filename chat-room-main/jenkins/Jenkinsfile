@@ -1,0 +1,46 @@
+pipeline {
+    agent any
+
+    environment {
+        BACKEND_IMAGE = "chat-backend"
+        FRONTEND_IMAGE = "chat-frontend"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Backend Build') {
+            steps {
+                dir('backend') {
+                    bat 'mvn clean package -DskipTests'
+                }
+            }
+        }
+
+        stage('Frontend Build') {
+            steps {
+                dir('front-chat') {
+                    bat 'npm install'
+                    bat 'npm run build'
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                bat 'docker compose build'
+            }
+        }
+
+        stage('Docker Deploy') {
+            steps {
+                bat 'docker compose up -d'
+            }
+        }
+    }
+}
