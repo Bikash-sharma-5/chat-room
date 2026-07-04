@@ -5,6 +5,17 @@ pipeline {
         maven 'MAVEN_HOME'
     }
 
+    environment {
+        // AWS Settings - Update these with your real AWS configuration details
+        AWS_ACCOUNT_ID = '123456789012'
+        AWS_REGION     = 'ap-south-1'     // e.g., ap-south-1 for Mumbai, us-east-1 for N. Virginia
+        CLUSTER_NAME   = 'your-eks-cluster-name'
+
+        // Target AWS ECR Repository Paths (Matches backend-deployment and frontend-deployment)
+        BACKEND_IMAGE  = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/chat-backend:latest"
+        FRONTEND_IMAGE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/chat-frontend:latest"
+    }
+
     stages {
 
         stage('Checkout') {
@@ -36,20 +47,48 @@ pipeline {
             }
         }
 
-       stage('Docker Build') {
-                   steps {
-                       dir('chat-room-main') {
-                           sh 'docker compose build'
-                       }
-                   }
-               }
+        stage('Docker Build & Push to ECR') {
+            steps {
+                withAWS(credentials: 'aws-credentials-id', region: "${AWS_REGION}") {
+                    sh """
+                    # 1. Log in to AWS Elastic Container Registry (ECR)
+                    aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
 
-               stage('Deploy') {
-                   steps {
-                       dir('chat-room-main') {
-                           sh 'docker compose up -d'
-                       }
-                   }
-               }
+                    # 2. Build and Tag the Backend Container
+                    docker build -t ${BACKEND_IMAGE} ./chat-room-main/backend
+                    docker push ${BACKEND_IMAGE}
+
+                    # 3. Build and Tag the Frontend Container
+                    docker build -t ${FRONTEND_IMAGE} ./chat-room-main/front-chat
+                    docker push ${FRONTEND_IMAGE}
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to AWS EKS') {
+            steps {
+                withAWS(credentials: 'aws-credentials-id', region: "${AWS_REGION}") {
+                    sh """
+                    # 1. Connect kubectl to your remote AWS EKS Cluster
+                    aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME}
+
+                    # 2. Apply the Kubernetes resource configurations from your k8s folder
+                    kubectl apply -f ./chat-room-main/k8s/namespace.yaml
+                    kubectl apply -f ./chat-room-main/k8s/configmap.yaml
+                    kubectl apply -f ./chat-room-main/k8s/secret.yaml
+                    kubectl apply -f ./chat-room-main/k8s/backend-deployment.yaml
+                    kubectl apply -f ./chat-room-main/k8s/backend-service.yaml
+                    kubectl apply -f ./chat-room-main/k8s/frontend-deployment.yaml
+                    kubectl apply -f ./chat-room-main/k8s/frontend-service.yaml
+                    kubectl apply -f ./chat-room-main/k8s/ingress.yaml
+
+                    # 3. Force rolling update in the correct namespace (chat-app) to fetch new images
+                    kubectl rollout restart deployment/chat-backend -n chat-app
+                    kubectl rollout restart deployment/chat-frontend -n chat-app
+                    """
+                }
+            }
+        }
     }
 }

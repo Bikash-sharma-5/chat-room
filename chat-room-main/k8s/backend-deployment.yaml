@@ -3,36 +3,25 @@ kind: Deployment
 metadata:
   name: chat-backend
   namespace: chat-app
-
 spec:
   replicas: 2
-
   selector:
     matchLabels:
       app: chat-backend
-
   template:
     metadata:
       labels:
         app: chat-backend
-
     spec:
       containers:
-
         - name: backend
-
-          image: YOUR_DOCKER_USERNAME/chat-backend:latest
-
+          # Updated to point to AWS ECR
+          image: 483528439431.dkr.ecr.ap-south-1.amazonaws.com/chat-backend:latest
           imagePullPolicy: Always
-
           ports:
-
             - containerPort: 8080
-
           envFrom:
-
             - configMapRef:
                 name: chat-config
-
             - secretRef:
                 name: chat-secret
