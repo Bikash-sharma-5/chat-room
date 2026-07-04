@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    tools {
+        maven 'MAVEN_HOME'
+        nodejs 'NODEJS_HOME'
+    }
+
     environment {
         BACKEND_IMAGE = "chat-backend"
         FRONTEND_IMAGE = "chat-frontend"
@@ -14,10 +19,18 @@ pipeline {
             }
         }
 
+        stage('Clean Workspace') {
+            steps {
+                sh 'rm -rf backend/target'
+                sh 'rm -rf front-chat/dist'
+                sh 'rm -rf front-chat/node_modules'
+            }
+        }
+
         stage('Backend Build') {
             steps {
                 dir('backend') {
-                    bat 'mvn clean package -DskipTests'
+                    sh 'mvn clean package -DskipTests'
                 }
             }
         }
@@ -25,22 +38,36 @@ pipeline {
         stage('Frontend Build') {
             steps {
                 dir('front-chat') {
-                    bat 'npm install'
-                    bat 'npm run build'
+                    sh 'npm install'
+                    sh 'npm run build'
                 }
             }
         }
 
         stage('Docker Build') {
             steps {
-                bat 'docker compose build'
+                sh 'docker compose build'
             }
         }
 
         stage('Docker Deploy') {
             steps {
-                bat 'docker compose up -d'
+                sh 'docker compose up -d --remove-orphans'
             }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Pipeline completed successfully"
+        }
+
+        failure {
+            echo "❌ Pipeline failed — check logs"
+        }
+
+        always {
+            echo "🏁 Build finished"
         }
     }
 }
