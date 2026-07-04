@@ -3,12 +3,6 @@ pipeline {
 
     tools {
         maven 'MAVEN_HOME'
-        nodejs 'NODEJS_HOME'
-    }
-
-    environment {
-        BACKEND_IMAGE = "chat-backend"
-        FRONTEND_IMAGE = "chat-frontend"
     }
 
     stages {
@@ -16,14 +10,6 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
-            }
-        }
-
-        stage('Clean Workspace') {
-            steps {
-                sh 'rm -rf backend/target'
-                sh 'rm -rf front-chat/dist'
-                sh 'rm -rf front-chat/node_modules'
             }
         }
 
@@ -50,24 +36,10 @@ pipeline {
             }
         }
 
-        stage('Docker Deploy') {
+        stage('Deploy') {
             steps {
-                sh 'docker compose up -d --remove-orphans'
+                sh 'docker compose up -d'
             }
-        }
-    }
-
-    post {
-        success {
-            echo "✅ Pipeline completed successfully"
-        }
-
-        failure {
-            echo "❌ Pipeline failed — check logs"
-        }
-
-        always {
-            echo "🏁 Build finished"
         }
     }
 }
